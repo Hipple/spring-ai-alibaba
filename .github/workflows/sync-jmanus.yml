@@ -1,0 +1,53 @@
+name: Sync jmanus branch
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'spring-ai-alibaba-jmanus/**' ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  sync-jmanus:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Check if jmanus folder exists
+      run: |
+        if [ ! -d "spring-ai-alibaba-jmanus" ]; then
+          echo "❌ 错误：找不到 spring-ai-alibaba-jmanus 目录"
+          exit 1
+        fi
+        echo "✅ 找到 spring-ai-alibaba-jmanus 目录"
+    
+    - name: Sync to jmanus branch
+      run: |
+        # 检查是否已经存在 jmanus 分支
+        if git show-ref --verify --quiet refs/remotes/origin/jmanus; then
+          echo "📋 jmanus 分支已存在，正在更新..."
+          # 先尝试 subtree pull（如果 jmanus 分支有独立提交）
+          git subtree pull --prefix=spring-ai-alibaba-jmanus origin jmanus --strategy=subtree -X theirs -m "合并 jmanus 分支更新" || {
+            echo "⚠️  拉取失败，这可能是第一次执行 subtree 操作"
+          }
+        else
+          echo "🆕 正在创建新的 jmanus 分支..."
+        fi
+        
+        # 推送更新到 jmanus 分支
+        git subtree push --prefix=spring-ai-alibaba-jmanus origin jmanus
+    
+    - name: Verify sync result
+      run: |
+        git fetch origin jmanus
+        git checkout jmanus
+        echo "✅ jmanus 分支同步成功"
+        echo "📝 最新提交：$(git log --oneline -1)"
